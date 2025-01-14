@@ -35,11 +35,28 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     capsules = []
     capsules = await new Promise((resolve, reject) => {
       chrome.storage.local.get(['capsules'], async (result) => {
+        
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else if (result.capsules && result.capsules.length > 0) {
           resolve(result.capsules);
         } else {
+          let is_user_login = await new Promise((resolve, reject) => {
+            chrome.storage.local.get(['extension_user_login'], async (result) => {
+             if (chrome.runtime.lastError) {
+               reject(chrome.runtime.lastError);
+             } else if (result.extension_user_login) {
+               resolve(result.extension_user_login);
+             }
+             else {
+               resolve(null);
+             }
+           });
+          });
+          if(!is_user_login){
+            resolve([])
+            return
+          }
           await getCapsules();
           chrome.storage.local.set({ capsules }, () => {
             console.log('Capsules saved in storage:', capsules);
@@ -66,6 +83,9 @@ async function showFolderSelectionModal(capsules) {
       } else if (result.activeCapsule) {
         resolve(result.activeCapsule);
       }
+      else {
+        resolve(null);
+      }
     });
   });
   
@@ -91,6 +111,7 @@ async function showFolderSelectionModal(capsules) {
   <ul id="saveit-folderList" style="height:40vh; overflow-y:auto; width:20vw;">
     ${capsules.map(capsule => {
       const isActive = capsule.capsule_id === activeCapsule;
+      
       return `<li>
         <button 
           data-id="${capsule.capsule_id}" 
@@ -109,6 +130,7 @@ async function showFolderSelectionModal(capsules) {
 
   const folderSearch = document.getElementById("saveit-folderSearch");
   const folderList = document.getElementById("saveit-folderList");
+  
 
   // In showFolderSelectionModal function
   folderSearch.addEventListener("input", async (e) => {
@@ -257,6 +279,7 @@ async function login(accessToken) {
         // chrome.storage.local.set({ 'token': token }, () => {
         //   console.log('Token stored');
         // });
+        chrome.storage.local.set({ extension_user_login: true });
         setAuthTokenCookie(token)
 
       })
@@ -324,6 +347,22 @@ async function saveTextFragment(text) {
     console.error("Error: activeCapsule is not set.");
     return;
   }
+  let is_user_login = await new Promise((resolve, reject) => {
+    chrome.storage.local.get(['extension_user_login'], async (result) => {
+     if (chrome.runtime.lastError) {
+       reject(chrome.runtime.lastError);
+     } else if (result.extension_user_login) {
+       resolve(result.extension_user_login);
+     }
+     else {
+       resolve(null);
+     }
+   });
+  });
+  if(!is_user_login) {
+    console.log("User is not logged in. Redirecting to login page.");
+    return;
+  }
   try {
     const res = await fetch(`${domain}/fragments/text`, {
       method: "POST",
@@ -348,6 +387,22 @@ async function saveTextFragment(text) {
 chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener(async (message) => {
     if (message.type === "SEARCH_CAPSULES") {
+      let is_user_login = await new Promise((resolve, reject) => {
+        chrome.storage.local.get(['extension_user_login'], async (result) => {
+         if (chrome.runtime.lastError) {
+           reject(chrome.runtime.lastError);
+         } else if (result.extension_user_login) {
+           resolve(result.extension_user_login);
+         }
+         else {
+           resolve(null);
+         }
+       });
+      });
+      if(!is_user_login) {
+        console.log("User is not logged in. Redirecting to login page.");
+        return;
+      }
       const res = await fetch(`${domain}/capsules/search?searchValue=${message.searchValue}`, {
         credentials: 'include'
       });
