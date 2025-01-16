@@ -2,13 +2,13 @@
     "manifest_version": 3,
     "name": "My First Extension",
     "version": "1.0",
-    "description": "This is my first Chrome extension. It shows a popup when clicked.",
+    "description": "saveit.tech",
     "action": {
       "default_popup": "popup.html",
       "default_icon": "icon.png"
     },
     "permissions": [ "activeTab",
-    "scripting","contextMenus","identity","storage","cookies", "desktopCapture","tabs"],
+    "scripting","contextMenus","identity","storage","cookies"],
     "oauth2": {
         "client_id": "935756544201-5q3i79vmjmgug22rtj7p7bgt8hh17uhn.apps.googleusercontent.com",
         "scopes": ["profile","email"]

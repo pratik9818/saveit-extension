@@ -104,11 +104,10 @@ async function showFolderSelectionModal(capsules) {
       `;
   }
   else {
-    
     modal.innerHTML = `
   <h3 style='font-family:Arial, Helvetica, sans-serif; margin:7px; font-weight:bold;'>Select a Capsule</h3>
   <input type="text" id="saveit-folderSearch" placeholder="Search Capsules Name" style="padding:5px; margin:4px; width:'100%';" />
-  <ul id="saveit-folderList" style="height:40vh; overflow-y:auto; width:20vw;">
+  <ul id="saveit-folderList" style="height:40vh; overflow-y:auto; width:20vw; width:100%;">
     ${capsules.map(capsule => {
       const isActive = capsule.capsule_id === activeCapsule;
       
@@ -127,28 +126,41 @@ async function showFolderSelectionModal(capsules) {
   }
 
   document.body.appendChild(modal);
-
+  const closeModal = (event) => {
+    if (!modal.contains(event.target)) {
+      modal.remove();
+      document.removeEventListener('click', closeModal); // Remove the event listener after closing the modal
+    }
+  };
+  document.addEventListener('click', closeModal);
   const folderSearch = document.getElementById("saveit-folderSearch");
   const folderList = document.getElementById("saveit-folderList");
   
-
+  function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  }
   // In showFolderSelectionModal function
-  folderSearch.addEventListener("input", async (e) => {
+  folderSearch.addEventListener("input", debounce(async (e) => {
     const searchValueState = e.target.value.toLowerCase();
+    
     if (!searchValueState) {
       chrome.storage.local.get(['capsules'], async (result) => {
         if (chrome.runtime.lastError) {
           console.error(chrome.runtime.lastError);
         } else if (result.capsules && result.capsules.length > 0) {
           if(!result.capsules.length){
-            folderList.innerHTML = `<li>No Capsules Found</li>`;
+            folderList.innerHTML = `<h4 style="text-align:center;">No Capsules Found</h4>`;
             return;
           }
           result.capsules.map(capsule => {
             const isActive = capsule.capsule_id === activeCapsule;
-            return `<li>
+            return folderList.innerHTML += `<li>
               <button 
-                data-id="${capsule.capsule_id}" 
+                data-id="${capsule.capsule_id}"
                 class="folder-button" 
                 style="padding: 5px; margin: 5px; cursor:pointer; font-size:1rem; 
                 ${isActive ? 'border: 2px solid #007bff; border-radius: 4px;' : 'border:none;'}"
@@ -156,8 +168,7 @@ async function showFolderSelectionModal(capsules) {
                 ${capsule.capsule_name.substring(0, 20)}
               </button>
             </li>`;
-          }).join('')
-          return;
+          })
         }
       })
     }
@@ -172,7 +183,6 @@ async function showFolderSelectionModal(capsules) {
     port.onMessage.addListener((response) => {
 
       if (response && response.data.data && searchValueState.length) {
-       
         folderList.innerHTML = response.data.data.map(capsule => {
           const isActive = capsule.capsule_id === activeCapsule;
           return `<li>
@@ -198,20 +208,12 @@ async function showFolderSelectionModal(capsules) {
         });
       }
       else{
-       if(searchValueState.length) folderList.innerHTML = `<li>No Capsules Found</li>`;
+       if(searchValueState.length) folderList.innerHTML = `<h4 style="text-align:center;">No Capsules Found</h4>`;
         return;
       }
     });
-  });
-
-
-  const closeModal = (event) => {
-    if (!modal.contains(event.target)) {
-      modal.remove();
-      document.removeEventListener('click', closeModal); // Remove the event listener after closing the modal
-    }
-  };
-  document.addEventListener('click', closeModal);
+  
+}, 400));
 
   if (capsules && capsules.length > 0) {
     document.querySelectorAll(".folder-button").forEach(button => {
@@ -325,7 +327,6 @@ function setAuthTokenCookie(token) {
         console.error('Error setting cookie:', chrome.runtime.lastError.message);
       } else if (cookie) {
         console.log('Cookie set successfully:', cookie);
-        getCapsules()
       } else {
         console.error('Unexpected issue: Cookie could not be set.');
       }
@@ -403,11 +404,15 @@ chrome.runtime.onConnect.addListener((port) => {
         console.log("User is not logged in. Redirecting to login page.");
         return;
       }
+     try {
       const res = await fetch(`${domain}/capsules/search?searchValue=${message.searchValue}`, {
         credentials: 'include'
       });
       const data = await res.json();
       port.postMessage({ data });
+     } catch (error) {
+      console.log(error);
+     }
     }
   });
 });
